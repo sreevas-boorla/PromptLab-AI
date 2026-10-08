@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Environment & Credentials
+.env
+.env.local
+.env.*.local
+
+# Databases & Storage
+*.db
+*.sqlite
+*.sqlite3
+promptlab.db
+
+# Build Outputs & Logs
+dist/
+build/
+.pytest_cache/
+*.log
+pipeline.log
+
+# IDE & OS Files
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db

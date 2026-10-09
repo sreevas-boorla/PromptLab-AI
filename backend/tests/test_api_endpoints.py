@@ -51,20 +51,16 @@ def test_missing_api_key_validation():
         if old_key:
             os.environ["OPENAI_API_KEY"] = old_key
 
-def test_optimizer_api():
+def test_mock_optimizer_requires_real_judge():
     payload = {
-        "original_prompt": "Write a python function to compute fibonacci numbers.",
+        "original_prompt": "Write a Python function.",
         "strategy": "chain_of_thought",
         "input_variables": {},
         "settings": {"model": "mock-llm", "temperature": 0.5, "max_tokens": 512}
     }
     res = client.post("/api/v1/optimizer/optimize", json=payload)
-    assert res.status_code == 200
-    data = res.json()
-    assert "original" in data
-    assert "optimized" in data
-    assert data["original"]["eval_score"] >= 0.0
-    assert data["optimized"]["eval_score"] >= 0.0
+    assert res.status_code != 200
+    assert "evaluation" in res.json().get("detail", "").lower() or "judge" in res.json().get("detail", "").lower()
 
 def test_model_comparison_api():
     payload = {

@@ -9,7 +9,7 @@ export const Evaluations: React.FC = () => {
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   
   const [promptInput, setPromptInput] = useState('Process query for {{topic}} and provide structured explanation.');
-  const [model, setModel] = useState('gpt-4o');
+  const [model, setModel] = useState('gemini-2.5-flash');
 
   const [loadingSuites, setLoadingSuites] = useState(true);
   const [running, setRunning] = useState(false);
@@ -138,8 +138,9 @@ export const Evaluations: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
                 >
                   <option value="gpt-4o">OpenAI GPT-4o</option>
-                  <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
-                  <option value="gemini-1.5-pro">Google Gemini 1.5 Pro</option>
+                  <option value="gpt-4o-mini">OpenAI GPT-4o mini</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                  <option value="llama-3.3-70b-versatile">Groq Llama 3.3 70B</option>
                 </select>
               </div>
 

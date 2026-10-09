@@ -108,3 +108,24 @@ def root():
 @app.get("/api/v1/health")
 def health_check():
     return {"status": "healthy", "database": "connected"}
+
+# Serve the built React UI and API from the same origin on Render.
+# The frontend build is created at frontend/dist during deployment.
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if frontend_dist.is_dir():
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def frontend_fallback(full_path: str):
+        if full_path.startswith("api/") or full_path == "docs" or full_path == "openapi.json":
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        candidate = (frontend_dist / full_path).resolve()
+        if candidate.is_relative_to(frontend_dist.resolve()) and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(frontend_dist / "index.html"))

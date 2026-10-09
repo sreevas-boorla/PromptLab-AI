@@ -5,7 +5,7 @@ import { ComparisonResponse } from '../types';
 
 export const Comparison: React.FC = () => {
   const [prompt, setPrompt] = useState('Compare Relational SQL vs NoSQL document databases for high-throughput transactional applications.');
-  const [selectedModels, setSelectedModels] = useState<string[]>(['gpt-4o', 'claude-3-5-sonnet', 'gemini-1.5-pro', 'llama-3-70b']);
+  const [selectedModels, setSelectedModels] = useState<string[]>(['gpt-4o-mini', 'gemini-2.5-flash', 'llama-3.3-70b-versatile']);
   
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ComparisonResponse | null>(null);
@@ -14,10 +14,10 @@ export const Comparison: React.FC = () => {
   const availableModels = [
     { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
     { id: 'gpt-4o-mini', label: 'OpenAI GPT-4o-mini' },
-    { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
-    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-    { id: 'llama-3-70b', label: 'Llama 3 70B' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Groq)' },
+    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B (Groq)' },
   ];
 
   const toggleModel = (id: string) => {

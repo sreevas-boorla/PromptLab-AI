@@ -15,6 +15,7 @@ const API_BASE = '/api/v1';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
@@ -31,6 +32,8 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  login: (password: string) => fetchJson<{authenticated: boolean}>(`${API_BASE}/auth/login`, { method: 'POST', body: JSON.stringify({ password }) }),
+  logout: () => fetchJson(`${API_BASE}/auth/logout`, { method: 'POST' }),
   // Playground API
   executePlayground: (data: {
     system_prompt: string;

@@ -81,3 +81,14 @@ npm run build
 
 ## 📜 License
 MIT License. Created for AI Engineering & Benchmark Audit.
+
+
+## Production security and deployment notes
+
+This application uses a **single-user private workspace** login, not public multi-user accounts. In the backend environment set `PROMPTLAB_ENV=production`, `PROMPTLAB_ACCESS_TOKEN` to a long random passphrase, and `ALLOWED_ORIGINS` to the exact frontend origin. Store all provider API keys as backend-only secrets. Do not put the passphrase in frontend JavaScript or a `VITE_*` variable.
+
+**Important deployment requirement:** Route frontend `/api/v1/*` requests through an HTTPS reverse proxy to the backend under the same site (e.g. your own domain), because the signed HttpOnly session cookie uses SameSite=Lax. Direct cross-site calls from a Vercel domain to a Render domain are not a supported session deployment setup. Configure the proxy and test login, playground and logout before publishing.
+
+Run `python -m pytest backend/tests -v` and `npm run lint && npm run test && npm run build` in `frontend/`. CI performs these checks on pull requests. Mock-provider tests do **not** establish that paid LLM APIs function; use `backend/tests/smoke_test_real_apis.py` with real keys in a secure environment.
+
+Estimated API pricing is hard-coded in `backend/app/providers.py` and may be outdated; treat displayed cost as illustrative until refreshed against provider pricing. Prompt comparisons without reference cases measure evaluator preferences, not verified factual accuracy.

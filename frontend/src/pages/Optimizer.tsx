@@ -6,7 +6,7 @@ import { OptimizerResponse } from '../types';
 export const Optimizer: React.FC = () => {
   const [originalPrompt, setOriginalPrompt] = useState('Write a python function that calculates prime factors of an integer.');
   const [strategy, setStrategy] = useState('chain_of_thought');
-  const [model, setModel] = useState('gpt-4o');
+  const [model, setModel] = useState('gemini-2.5-flash');
   const [temperature, setTemperature] = useState(0.7);
 
   const [loading, setLoading] = useState(false);
@@ -88,9 +88,9 @@ export const Optimizer: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
                 >
                   <option value="gpt-4o">OpenAI GPT-4o</option>
-                  <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
-                  <option value="gemini-1.5-pro">Google Gemini 1.5 Pro</option>
-                  <option value="llama-3-70b">Meta Llama 3 70B</option>
+                  <option value="gpt-4o-mini">OpenAI GPT-4o mini</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                  <option value="llama-3.3-70b-versatile">Groq Llama 3.3 70B</option>
                 </select>
               </div>
             </div>

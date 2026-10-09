@@ -58,5 +58,7 @@ def compare_models(req: ComparisonRequest, db: Session = Depends(get_db)):
             cheapest_model=cheapest_model
         )
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Comparison error: {str(e)}")

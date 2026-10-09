@@ -12,12 +12,12 @@ router = APIRouter(prefix="/api/v1/optimizer", tags=["Optimizer"])
 @router.post("/optimize", response_model=OptimizerResponse)
 def optimize_prompt_and_run(req: OptimizerRequest, db: Session = Depends(get_db)):
     try:
-        # 1. Transform original prompt using selected strategy
         opt_prompt_text, strategy_summary = PromptOptimizerEngine.optimize_prompt(
-            req.original_prompt, req.strategy
+            original_prompt=req.original_prompt,
+            strategy=req.strategy,
+            model=req.settings.model
         )
 
-        # 2. Execute ORIGINAL Prompt with inputs & settings
         orig_out, orig_lat, orig_pt, orig_ct, orig_cost, orig_mock = LLMProvider.generate(
             system_prompt=req.system_prompt,
             user_prompt=req.original_prompt,
@@ -27,7 +27,6 @@ def optimize_prompt_and_run(req: OptimizerRequest, db: Session = Depends(get_db)
             max_tokens=req.settings.max_tokens
         )
 
-        # 3. Execute OPTIMIZED Prompt with IDENTICAL inputs & settings
         opt_out, opt_lat, opt_pt, opt_ct, opt_cost, opt_mock = LLMProvider.generate(
             system_prompt=req.system_prompt,
             user_prompt=opt_prompt_text,
@@ -37,11 +36,9 @@ def optimize_prompt_and_run(req: OptimizerRequest, db: Session = Depends(get_db)
             max_tokens=req.settings.max_tokens
         )
 
-        # 4. Evaluate quality scores for both prompts using LLM-as-a-judge real rubric
-        orig_score, _, _ = EvaluationEngine.evaluate_llm_judge(orig_out, "")
-        opt_score, _, _ = EvaluationEngine.evaluate_llm_judge(opt_out, "")
+        orig_score, _, _ = EvaluationEngine.evaluate_llm_judge(orig_out, "", {"judge_model": req.settings.model})
+        opt_score, _, _ = EvaluationEngine.evaluate_llm_judge(opt_out, "", {"judge_model": req.settings.model})
 
-        # Log analytics
         db.add(AnalyticsLog(model=req.settings.model, latency_ms=orig_lat, prompt_tokens=orig_pt, completion_tokens=orig_ct, total_cost=orig_cost, action_type="optimizer_original"))
         db.add(AnalyticsLog(model=req.settings.model, latency_ms=opt_lat, prompt_tokens=opt_pt, completion_tokens=opt_ct, total_cost=opt_cost, action_type="optimizer_optimized"))
         db.commit()
@@ -70,8 +67,10 @@ def optimize_prompt_and_run(req: OptimizerRequest, db: Session = Depends(get_db)
             original=orig_result,
             optimized=opt_result,
             strategy_applied=strategy_summary,
-            improvement_summary=f"Optimized prompt quality score: {opt_score:.2f} vs Original: {orig_score:.2f}."
+            improvement_summary=f"Optimized prompt quality score: {(opt_score * 100):.1f}% vs Original: {(orig_score * 100):.1f}%."
         )
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Optimizer error: {str(e)}")

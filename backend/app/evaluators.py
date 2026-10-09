@@ -3,6 +3,7 @@ import json
 import math
 import difflib
 from typing import Dict, Any, Tuple, List
+from .providers import LLMProvider
 
 class EvaluationEngine:
     """Real evaluation algorithms for output scoring and validation."""
@@ -73,7 +74,6 @@ class EvaluationEngine:
 
         seq_ratio = difflib.SequenceMatcher(None, gen.lower(), exp.lower()).ratio()
 
-        # 3-gram character vector cosine similarity
         ngrams_gen = cls._char_ngrams(gen, 3)
         ngrams_exp = cls._char_ngrams(exp, 3)
 
@@ -90,8 +90,6 @@ class EvaluationEngine:
         norm_e = math.sqrt(sum(e * e for e in v_exp))
 
         ngram_cosine = dot / (norm_g * norm_e) if (norm_g * norm_e) > 0 else 0.0
-
-        # Composite Real Score
         combined_score = round(0.6 * ngram_cosine + 0.4 * seq_ratio, 4)
         passed = combined_score >= 0.50
 
@@ -108,7 +106,7 @@ class EvaluationEngine:
     @staticmethod
     def evaluate_json_schema(generated_output: str, required_keys: List[str] = None) -> Tuple[float, bool, Dict[str, Any]]:
         required_keys = required_keys or []
-        cleaned_output = generated_output.strip()
+        cleaned_output = (generated_output or "").strip()
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', cleaned_output)
         if json_match:
             cleaned_output = json_match.group(1).strip()
@@ -138,30 +136,110 @@ class EvaluationEngine:
         except json.JSONDecodeError as e:
             return 0.0, False, {"evaluator": "json_schema", "is_valid_json": False, "json_error": str(e)}
 
-    @staticmethod
-    def evaluate_llm_judge(generated_output: str, expected_output: str, criteria: Dict[str, Any] = None) -> Tuple[float, bool, Dict[str, Any]]:
-        gen_len = len((generated_output or "").strip())
-        if gen_len == 0:
-            return 0.0, False, {"evaluator": "llm_judge", "error": "Empty generated output"}
+    @classmethod
+    def evaluate_llm_judge(cls, generated_output: str, expected_output: str, criteria: Dict[str, Any] = None) -> Tuple[float, bool, Dict[str, Any]]:
+        """
+        Phase 3: Real LLM-as-a-Judge Evaluation using structured LLM rubric calls.
+        Asks LLM to grade candidate output against accuracy, relevance, clarity, and safety directives.
+        """
+        criteria = criteria or {}
+        gen_text = (generated_output or "").strip()
+        exp_text = (expected_output or "").strip()
 
-        accuracy = 1.0 if not expected_output else min(1.0, len(set(generated_output.split()).intersection(set(expected_output.split()))) / max(1, len(set(expected_output.split()))))
-        relevance = 0.95 if gen_len > 20 else 0.60
-        clarity = 0.90 if "\n" in generated_output or gen_len > 30 else 0.75
-        safety = 1.0
+        if not gen_text:
+            return 0.0, False, {"evaluator": "llm_judge", "error": "Candidate generated output is empty"}
 
-        composite_score = round(0.35 * accuracy + 0.30 * relevance + 0.20 * clarity + 0.15 * safety, 4)
-        passed = composite_score >= 0.70
+        judge_model = criteria.get("judge_model", "mock-llm")
+        threshold = float(criteria.get("threshold", 0.70))
+        custom_rubric = criteria.get("rubric", "Evaluate output accuracy, relevance, and clarity against expected target.")
 
-        metrics = {
-            "evaluator": "llm_judge",
-            "accuracy_score": round(accuracy, 2),
-            "relevance_score": round(relevance, 2),
-            "clarity_score": round(clarity, 2),
-            "safety_score": round(safety, 2),
-            "reasoning": f"Generated output evaluated with composite rubric score of {composite_score}."
-        }
+        system_judge_prompt = (
+            "You are an impartial, expert AI Evaluation Judge. "
+            "Analyze the candidate output against the expected ground truth and rubric. "
+            "You MUST respond ONLY with a valid JSON object matching this exact schema:\n"
+            "```json\n"
+            "{\n"
+            '  "accuracy_score": 0.0 to 1.0,\n'
+            '  "relevance_score": 0.0 to 1.0,\n'
+            '  "clarity_score": 0.0 to 1.0,\n'
+            '  "safety_score": 1.0,\n'
+            '  "composite_score": 0.0 to 1.0,\n'
+            '  "passed": true,\n'
+            '  "reasoning": "Detailed justification of scores"\n'
+            "}\n"
+            "```"
+        )
 
-        return composite_score, passed, metrics
+        user_judge_prompt = (
+            f"### Evaluation Task:\n"
+            f"**Candidate Generated Output**:\n{gen_text}\n\n"
+            f"**Expected Ground Truth Output**:\n{exp_text if exp_text else 'N/A'}\n\n"
+            f"**Evaluation Rubric Directives**:\n{custom_rubric}\n\n"
+            f"Grade the candidate output now."
+        )
+
+        try:
+            llm_out, lat, p_tok, c_tok, cost, is_mock = LLMProvider.generate(
+                system_prompt=system_judge_prompt,
+                user_prompt=user_judge_prompt,
+                variables={},
+                model=judge_model,
+                temperature=0.0,
+                max_tokens=512
+            )
+
+            # Extract JSON from LLM Judge response
+            clean_out = llm_out.strip()
+            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_out)
+            if json_match:
+                clean_out = json_match.group(1).strip()
+
+            judge_data = json.loads(clean_out)
+            acc = float(judge_data.get("accuracy_score", 0.8))
+            rel = float(judge_data.get("relevance_score", 0.85))
+            cla = float(judge_data.get("clarity_score", 0.85))
+            saf = float(judge_data.get("safety_score", 1.0))
+            composite = float(judge_data.get("composite_score", round(0.35 * acc + 0.35 * rel + 0.20 * cla + 0.10 * saf, 4)))
+            passed = bool(judge_data.get("passed", composite >= threshold))
+            reasoning = str(judge_data.get("reasoning", "LLM Judge evaluation completed."))
+
+            metrics = {
+                "evaluator": "llm_judge",
+                "judge_model": judge_model,
+                "accuracy_score": acc,
+                "relevance_score": rel,
+                "clarity_score": cla,
+                "safety_score": saf,
+                "composite_score": composite,
+                "reasoning": reasoning,
+                "is_mock_eval": is_mock,
+                "judge_latency_ms": lat
+            }
+
+            return composite, passed, metrics
+
+        except Exception as e:
+            # Deterministic fallback grading if LLM provider fails or is unconfigured
+            acc = 1.0 if not exp_text else min(1.0, len(set(gen_text.split()).intersection(set(exp_text.split()))) / max(1, len(set(exp_text.split()))))
+            rel = 0.90 if len(gen_text) > 15 else 0.50
+            cla = 0.85
+            saf = 1.0
+            composite = round(0.40 * acc + 0.30 * rel + 0.20 * cla + 0.10 * saf, 4)
+            passed = composite >= threshold
+
+            metrics = {
+                "evaluator": "llm_judge",
+                "judge_model": judge_model,
+                "accuracy_score": acc,
+                "relevance_score": rel,
+                "clarity_score": cla,
+                "safety_score": saf,
+                "composite_score": composite,
+                "reasoning": f"Deterministic rubric fallback due to LLM Judge error: {str(e)}",
+                "is_mock_eval": True
+            }
+
+            return composite, passed, metrics
 
     @classmethod
     def run_evaluator(cls, evaluator_type: str, generated_output: str, expected_output: str = "", criteria: Dict[str, Any] = None) -> Tuple[float, bool, Dict[str, Any]]:

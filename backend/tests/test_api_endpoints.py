@@ -20,7 +20,7 @@ def test_playground_execution_api():
         "user_prompt": "Hello {{name}}, welcome to {{service}}.",
         "input_variables": {"name": "Alice", "service": "PromptLab AI"},
         "settings": {
-            "model": "gpt-4o",
+            "model": "mock-llm",
             "temperature": 0.7,
             "max_tokens": 256
         }
@@ -31,14 +31,32 @@ def test_playground_execution_api():
     assert "output" in data
     assert "metrics" in data
     assert data["metrics"]["latency_ms"] > 0
+    assert data["metrics"]["is_mock"] is True
     assert "Alice" in data["substituted_prompt"]
+
+def test_missing_api_key_validation():
+    """Verify Phase 2 requirement: Missing credentials throw explicit error when real model selected."""
+    old_key = os.environ.pop("OPENAI_API_KEY", None)
+    try:
+        payload = {
+            "system_prompt": "",
+            "user_prompt": "Test query",
+            "input_variables": {},
+            "settings": {"model": "gpt-4o", "temperature": 0.7, "max_tokens": 100}
+        }
+        res = client.post("/api/v1/playground/execute", json=payload)
+        assert res.status_code == 400
+        assert "Missing API key OPENAI_API_KEY" in res.json()["detail"]
+    finally:
+        if old_key:
+            os.environ["OPENAI_API_KEY"] = old_key
 
 def test_optimizer_api():
     payload = {
         "original_prompt": "Write a python function to compute fibonacci numbers.",
         "strategy": "chain_of_thought",
         "input_variables": {},
-        "settings": {"model": "gpt-4o", "temperature": 0.5, "max_tokens": 512}
+        "settings": {"model": "mock-llm", "temperature": 0.5, "max_tokens": 512}
     }
     res = client.post("/api/v1/optimizer/optimize", json=payload)
     assert res.status_code == 200
@@ -52,12 +70,12 @@ def test_model_comparison_api():
     payload = {
         "user_prompt": "Explain quantum entanglement in simple terms.",
         "input_variables": {},
-        "models": ["gpt-4o", "claude-3-5-sonnet", "gemini-1.5-pro"]
+        "models": ["mock-llm", "mock-llm"]
     }
     res = client.post("/api/v1/comparison/compare", json=payload)
     assert res.status_code == 200
     data = res.json()
-    assert len(data["results"]) == 3
+    assert len(data["results"]) == 2
     assert data["fastest_model"] != ""
     assert data["cheapest_model"] != ""
 
@@ -70,7 +88,7 @@ def test_prompts_crud_api():
         "initial_version": {
             "system_prompt": "Test sys",
             "user_prompt": "Test user {{var}}",
-            "config_settings": {"model": "gpt-4o"},
+            "config_settings": {"model": "mock-llm"},
             "notes": "v1"
         }
     }

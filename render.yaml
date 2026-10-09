@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: promptlab-api
+    env: python
+    buildCommand: pip install -r backend/requirements.txt && python backend/migrations/migrate.py
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --cwd backend
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: PROMPTLAB_DB_PATH
+        value: /tmp/promptlab.db
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

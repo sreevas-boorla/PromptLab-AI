@@ -21,7 +21,6 @@ def execute_prompt(req: PlaygroundExecuteRequest, db: Session = Depends(get_db))
 
         sub_prompt = LLMProvider.substitute_variables(req.user_prompt, req.input_variables)
 
-        # Log metrics to DB
         log_entry = AnalyticsLog(
             model=req.settings.model,
             latency_ms=latency_ms,
@@ -48,5 +47,7 @@ def execute_prompt(req: PlaygroundExecuteRequest, db: Session = Depends(get_db))
             substituted_prompt=sub_prompt
         )
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")

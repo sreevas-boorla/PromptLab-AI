@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from ..database import get_db
-from ..models import AnalyticsLog, EvalResult
+from ..models import AnalyticsLog, EvalResult, EvalRun
 from ..schemas import AnalyticsSummaryResponse
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
@@ -72,8 +72,8 @@ def get_analytics_summary(db: Session = Depends(get_db)):
         date_str = str(row.log_date or datetime.date.today().strftime("%Y-%m-%d"))
         timeline.append({
             "date": date_str,
-            "playground_calls": int(row.total_calls or 0),
-            "evaluations_run": db.query(EvalResult).filter(func.date(EvalResult.run_id) == row.log_date).count(),
+            "playground_calls": db.query(AnalyticsLog).filter(func.date(AnalyticsLog.created_at) == row.log_date, AnalyticsLog.action_type == "playground").count(),
+            "evaluations_run": db.query(EvalRun).filter(func.date(EvalRun.created_at) == row.log_date).count(),
             "cost_usd": round(float(row.daily_cost or 0.0), 6)
         })
 

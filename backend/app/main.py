@@ -26,16 +26,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Optional access token for a private single-user backend.
+# Single-user authentication. Secret never reaches frontend code or browser storage.
+import hashlib
+import hmac
+import time
+from fastapi import Body, Response
+
+def sign_session(expiry: str, secret: str) -> str:
+    return hmac.new(secret.encode(), expiry.encode(), hashlib.sha256).hexdigest()
+
+@app.post("/api/v1/auth/login")
+def login(response: Response, data: dict = Body(...)):
+    secret = os.getenv("PROMPTLAB_ACCESS_TOKEN", "")
+    supplied = data.get("password", "")
+    if not secret or not isinstance(supplied, str) or not hmac.compare_digest(secret, supplied):
+        return JSONResponse(status_code=401, content={"detail": "Invalid passphrase"})
+    expiry = str(int(time.time()) + 8 * 3600)
+    response.set_cookie("promptlab_session", expiry + "." + sign_session(expiry, secret),
+                        httponly=True, secure=os.getenv("PROMPTLAB_ENV") == "production",
+                        samesite="lax", max_age=28800, path="/api/v1")
+    return {"authenticated": True}
+
+@app.post("/api/v1/auth/logout")
+def logout(response: Response):
+    response.delete_cookie("promptlab_session", path="/api/v1")
+    return {"authenticated": False}
+
 @app.middleware("http")
 async def protect_api(request: Request, call_next):
-    import hmac
-    if request.url.path.startswith("/api/v1/") and request.url.path != "/api/v1/health":
-        token = os.getenv("PROMPTLAB_ACCESS_TOKEN", "")
-        if os.getenv("PROMPTLAB_ENV", "development") == "production" and not token:
-            return JSONResponse(status_code=503, content={"detail": "API access protection not configured"})
-        if token and not hmac.compare_digest(request.headers.get("X-PromptLab-Token", ""), token):
-            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    path = request.url.path
+    if path.startswith("/api/v1/") and path not in ("/api/v1/health", "/api/v1/auth/login"):
+        secret = os.getenv("PROMPTLAB_ACCESS_TOKEN", "")
+        if os.getenv("PROMPTLAB_ENV", "development") == "production" and not secret:
+            return JSONResponse(status_code=503, content={"detail": "Production access not configured"})
+        if secret:
+            try:
+                expiry, signature = request.cookies.get("promptlab_session", "").split(".", 1)
+                valid = int(expiry) > int(time.time()) and hmac.compare_digest(signature, sign_session(expiry, secret))
+            except (ValueError, TypeError):
+                valid = False
+            if not valid:
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                origin = request.headers.get("origin")
+                if origin and origin not in origins:
+                    return JSONResponse(status_code=403, content={"detail": "Untrusted origin"})
     return await call_next(request)
 
 # Global Exception Handlers for Provider & Validation Errors

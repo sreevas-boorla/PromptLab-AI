@@ -47,10 +47,17 @@ def test_json_schema_evaluator():
     assert passed_missing is False
     assert "count" in metrics_missing["missing_keys"]
 
-def test_llm_judge_evaluator():
-    generated = "Detailed analysis of quantum superposition in computing systems."
-    expected = "Analysis of quantum computing."
-    score, passed, metrics = EvaluationEngine.evaluate_llm_judge(generated, expected)
-    assert score >= 0.70
-    assert passed is True
-    assert "accuracy_score" in metrics
+def test_llm_judge_requires_real_model():
+    with pytest.raises(ValueError, match="real judge model"):
+        EvaluationEngine.evaluate_llm_judge("response", "reference")
+
+
+def test_llm_judge_failed_provider_never_fabricates_scores(monkeypatch):
+    from app.providers import LLMProvider
+
+    def fail(**kwargs):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(LLMProvider, "generate", fail)
+    with pytest.raises(RuntimeError, match="no heuristic scores"):
+        EvaluationEngine.evaluate_llm_judge("response", "reference", {"judge_model": "gemini-2.5-flash"})

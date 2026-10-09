@@ -149,7 +149,9 @@ class EvaluationEngine:
         if not gen_text:
             return 0.0, False, {"evaluator": "llm_judge", "error": "Candidate generated output is empty"}
 
-        judge_model = criteria.get("judge_model", "mock-llm")
+        judge_model = criteria.get("judge_model")
+        if not judge_model or judge_model == "mock-llm":
+            raise ValueError("LLM-as-a-Judge requires an explicitly configured real judge model.")
         threshold = float(criteria.get("threshold", 0.70))
         custom_rubric = criteria.get("rubric", "Evaluate output accuracy, relevance, and clarity against expected target.")
 
@@ -195,12 +197,14 @@ class EvaluationEngine:
                 clean_out = json_match.group(1).strip()
 
             judge_data = json.loads(clean_out)
-            acc = float(judge_data.get("accuracy_score", 0.8))
-            rel = float(judge_data.get("relevance_score", 0.85))
-            cla = float(judge_data.get("clarity_score", 0.85))
-            saf = float(judge_data.get("safety_score", 1.0))
-            composite = float(judge_data.get("composite_score", round(0.35 * acc + 0.35 * rel + 0.20 * cla + 0.10 * saf, 4)))
-            passed = bool(judge_data.get("passed", composite >= threshold))
+            acc = float(judge_data["accuracy_score"])
+            rel = float(judge_data["relevance_score"])
+            cla = float(judge_data["clarity_score"])
+            saf = float(judge_data["safety_score"])
+            composite = round(0.35 * acc + 0.35 * rel + 0.20 * cla + 0.10 * saf, 4)
+            if not all(0 <= item <= 1 for item in (acc, rel, cla, saf, composite)):
+                raise ValueError("Judge scores must be between 0 and 1")
+            passed = composite >= threshold
             reasoning = str(judge_data.get("reasoning", "LLM Judge evaluation completed."))
 
             metrics = {
@@ -219,27 +223,7 @@ class EvaluationEngine:
             return composite, passed, metrics
 
         except Exception as e:
-            # Deterministic fallback grading if LLM provider fails or is unconfigured
-            acc = 1.0 if not exp_text else min(1.0, len(set(gen_text.split()).intersection(set(exp_text.split()))) / max(1, len(set(exp_text.split()))))
-            rel = 0.90 if len(gen_text) > 15 else 0.50
-            cla = 0.85
-            saf = 1.0
-            composite = round(0.40 * acc + 0.30 * rel + 0.20 * cla + 0.10 * saf, 4)
-            passed = composite >= threshold
-
-            metrics = {
-                "evaluator": "llm_judge",
-                "judge_model": judge_model,
-                "accuracy_score": acc,
-                "relevance_score": rel,
-                "clarity_score": cla,
-                "safety_score": saf,
-                "composite_score": composite,
-                "reasoning": f"Deterministic rubric fallback due to LLM Judge error: {str(e)}",
-                "is_mock_eval": True
-            }
-
-            return composite, passed, metrics
+            raise RuntimeError(f"LLM evaluation failed; no heuristic scores were recorded: {e}") from e
 
     @classmethod
     def run_evaluator(cls, evaluator_type: str, generated_output: str, expected_output: str = "", criteria: Dict[str, Any] = None) -> Tuple[float, bool, Dict[str, Any]]:

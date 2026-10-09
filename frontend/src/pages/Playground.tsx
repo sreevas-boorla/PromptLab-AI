@@ -6,7 +6,7 @@ import { PlaygroundResponse } from '../types';
 export const Playground: React.FC = () => {
   const [systemPrompt, setSystemPrompt] = useState('You are an expert AI assistant providing concise, accurate answers.');
   const [userPrompt, setUserPrompt] = useState('Draft a customer support email to {{customer_name}} regarding their order #{{order_id}} for {{product_name}}.');
-  const [model, setModel] = useState('gpt-4o');
+  const [model, setModel] = useState('gemini-2.5-flash');
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(512);
   
@@ -257,9 +257,11 @@ export const Playground: React.FC = () => {
               >
                 <option value="gpt-4o">OpenAI GPT-4o</option>
                 <option value="gpt-4o-mini">OpenAI GPT-4o-mini</option>
-                <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
-                <option value="gemini-1.5-pro">Google Gemini 1.5 Pro</option>
-                <option value="llama-3-70b">Meta Llama 3 70B</option>
+                <option value="gemini-2.5-flash">Google Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro">Google Gemini 2.5 Pro</option>
+                <option value="llama-3.3-70b-versatile">Groq Llama 3.3 70B</option>
+                <option value="llama-3.1-8b-instant">Groq Llama 3.1 8B</option>
+                <option value="mock-llm">Mock LLM (Testing only)</option>
               </select>
             </div>
 

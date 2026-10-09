@@ -64,14 +64,12 @@ class PromptOptimizerEngine:
             summary = str(opt_data.get("strategy_applied", f"Applied AI-guided {strategy} optimization.")).strip()
 
             if not opt_prompt:
-                return cls._template_optimize(original_clean, strategy)
+                raise ValueError("LLM returned an empty optimized prompt")
 
             return opt_prompt, summary
 
         except Exception as e:
-            # Fallback to template transformation if LLM provider fails
-            opt_tmpl, sum_tmpl = cls._template_optimize(original_clean, strategy)
-            return opt_tmpl, f"{sum_tmpl} (Fallback: {str(e)})"
+            raise RuntimeError(f"AI prompt optimization failed: {e}") from e
 
     @staticmethod
     def _template_optimize(original_clean: str, strategy: str) -> Tuple[str, str]:

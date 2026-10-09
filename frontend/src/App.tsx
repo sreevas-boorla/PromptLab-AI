@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState } from 'react';
 import { api } from './services/api';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';

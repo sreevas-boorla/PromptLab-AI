@@ -55,7 +55,7 @@ class ComparisonRequest(BaseModel):
     system_prompt: str = ""
     user_prompt: str
     input_variables: Dict[str, Any] = Field(default_factory=dict)
-    models: List[str] = Field(default_factory=lambda: ["gpt-4o", "claude-3-5-sonnet", "gemini-1.5-pro", "llama-3-70b"])
+    models: List[str] = Field(default_factory=lambda: ["gpt-4o-mini", "gemini-2.5-flash", "llama-3.3-70b-versatile"])
     temperature: float = 0.7
     max_tokens: int = 1024
 

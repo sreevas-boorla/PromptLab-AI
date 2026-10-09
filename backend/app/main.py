@@ -15,16 +15,28 @@ app = FastAPI(
 )
 
 # Phase 6: Configurable Production CORS Setup
-allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Optional access token for a private single-user backend.
+@app.middleware("http")
+async def protect_api(request: Request, call_next):
+    import hmac
+    if request.url.path.startswith("/api/v1/") and request.url.path != "/api/v1/health":
+        token = os.getenv("PROMPTLAB_ACCESS_TOKEN", "")
+        if os.getenv("PROMPTLAB_ENV", "development") == "production" and not token:
+            return JSONResponse(status_code=503, content={"detail": "API access protection not configured"})
+        if token and not hmac.compare_digest(request.headers.get("X-PromptLab-Token", ""), token):
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return await call_next(request)
 
 # Global Exception Handlers for Provider & Validation Errors
 @app.exception_handler(ValueError)

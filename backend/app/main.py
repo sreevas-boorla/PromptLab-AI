@@ -98,12 +98,12 @@ app.include_router(analytics.router)
 
 @app.get("/")
 def root():
-    return {
-        "status": "online",
-        "service": "PromptLab AI Engine API",
-        "version": "1.0.0",
-        "docs_url": "/docs"
-    }
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    index_file = Path(__file__).resolve().parents[2] / "frontend" / "dist" / "index.html"
+    if index_file.is_file():
+        return FileResponse(str(index_file))
+    return JSONResponse(status_code=503, content={"detail": "Frontend build is missing"})
 
 @app.get("/api/v1/health")
 def health_check():
